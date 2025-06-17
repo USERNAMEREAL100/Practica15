@@ -1,13 +1,9 @@
 import java.util.Scanner;
 import java.util.Random;
 import java.io.*;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 public class TicTacToeFullGame {
-    static int boardSize = 3;
-    static String playerXName = "Гравець X";
-    static String playerOName = "Гравець O";
+    static GameSettings settings = new GameSettings("Гравець X", "Гравець O", 3);
     static final String CONFIG_FILE = "config.txt";
     static final String STATS_FILE = "stats.txt";
 
@@ -54,20 +50,21 @@ public class TicTacToeFullGame {
     public static void configureSettings(Scanner scanner) {
         scanner.nextLine();
         System.out.print("Введіть ім'я гравця X: ");
-        playerXName = scanner.nextLine();
+        settings.playerXName = scanner.nextLine();
         System.out.print("Введіть ім'я гравця O: ");
-        playerOName = scanner.nextLine();
+        settings.playerOName = scanner.nextLine();
         System.out.print("Виберіть розмір поля (3, 5, 7, 9): ");
-        boardSize = scanner.nextInt();
+        settings.boardSize = scanner.nextInt();
         saveConfig();
     }
 
     public static void loadConfig() {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(CONFIG_FILE));
-            playerXName = reader.readLine();
-            playerOName = reader.readLine();
-            boardSize = Integer.parseInt(reader.readLine());
+            String x = reader.readLine();
+            String o = reader.readLine();
+            int size = Integer.parseInt(reader.readLine());
+            settings = new GameSettings(x, o, size);
             reader.close();
         } catch (Exception e) {
         }
@@ -76,9 +73,9 @@ public class TicTacToeFullGame {
     public static void saveConfig() {
         try {
             BufferedWriter writer = new BufferedWriter(new FileWriter(CONFIG_FILE));
-            writer.write(playerXName + "\n");
-            writer.write(playerOName + "\n");
-            writer.write(boardSize + "\n");
+            writer.write(settings.playerXName + "\n");
+            writer.write(settings.playerOName + "\n");
+            writer.write(settings.boardSize + "\n");
             writer.close();
         } catch (Exception e) {
             System.out.println("Помилка збереження конфігурації");
@@ -101,8 +98,8 @@ public class TicTacToeFullGame {
     public static void saveStatistics(String winner, char playerChar) {
         try {
             BufferedWriter writer = new BufferedWriter(new FileWriter(STATS_FILE, true));
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            writer.write("Дата: " + timestamp + ", Переможець: " + winner + " (" + playerChar + "), Розмір поля: " + boardSize + "\n");
+            GameStats stat = new GameStats(winner, playerChar, settings.boardSize);
+            writer.write(stat.toString() + "\n");
             writer.close();
         } catch (Exception e) {
             System.out.println("Помилка збереження статистики");
@@ -110,40 +107,36 @@ public class TicTacToeFullGame {
     }
 
     public static void playGame(Scanner scanner, Random random) {
-        char[][] board = new char[boardSize][boardSize];
-        for (int i = 0; i < boardSize; i++)
-            for (int j = 0; j < boardSize; j++)
-                board[i][j] = ' ';
-
+        GameBoard board = new GameBoard(settings.boardSize);
         char player = 'X';
         int moves = 0;
 
         while (true) {
             System.out.println("\nХРЕСТИКИ НУЛИКИ:");
-            printBoard(board);
+            printBoard(board.board);
 
             int row, col;
             while (true) {
-                System.out.print((player == 'X' ? playerXName : playerOName) + ", введіть координати (рядок стовпець): ");
+                System.out.print((player == 'X' ? settings.playerXName : settings.playerOName) + ", введіть координати (рядок стовпець): ");
                 row = scanner.nextInt() - 1;
                 col = scanner.nextInt() - 1;
-                if (row >= 0 && row < boardSize && col >= 0 && col < boardSize && board[row][col] == ' ') break;
+                if (row >= 0 && row < board.size && col >= 0 && col < board.size && board.board[row][col] == ' ') break;
                 System.out.println("Некоректний хід.");
             }
 
-            board[row][col] = player;
+            board.board[row][col] = player;
             moves++;
 
-            if (checkWin(board, player)) {
-                printBoard(board);
-                String winner = player == 'X' ? playerXName : playerOName;
+            if (checkWin(board.board, player)) {
+                printBoard(board.board);
+                String winner = player == 'X' ? settings.playerXName : settings.playerOName;
                 System.out.println("Переміг: " + winner);
                 saveStatistics(winner, player);
                 break;
             }
 
-            if (moves == boardSize * boardSize) {
-                printBoard(board);
+            if (moves == board.size * board.size) {
+                printBoard(board.board);
                 System.out.println("Нічия.");
                 saveStatistics("Нічия", '-');
                 break;
@@ -153,6 +146,7 @@ public class TicTacToeFullGame {
     }
 
     public static void printBoard(char[][] board) {
+        int boardSize = board.length;
         System.out.print("    ");
         for (int i = 1; i <= boardSize; i++) System.out.print(i + "   ");
         System.out.println();
@@ -176,18 +170,21 @@ public class TicTacToeFullGame {
     }
 
     public static boolean checkWin(char[][] board, char player) {
-        for (int i = 0; i < boardSize; i++) {
+        int size = board.length;
+
+        for (int i = 0; i < size; i++) {
             boolean row = true, col = true;
-            for (int j = 0; j < boardSize; j++) {
+            for (int j = 0; j < size; j++) {
                 if (board[i][j] != player) row = false;
                 if (board[j][i] != player) col = false;
             }
             if (row || col) return true;
         }
+
         boolean mainDiag = true, antiDiag = true;
-        for (int i = 0; i < boardSize; i++) {
+        for (int i = 0; i < size; i++) {
             if (board[i][i] != player) mainDiag = false;
-            if (board[i][boardSize - i - 1] != player) antiDiag = false;
+            if (board[i][size - i - 1] != player) antiDiag = false;
         }
         return mainDiag || antiDiag;
     }
